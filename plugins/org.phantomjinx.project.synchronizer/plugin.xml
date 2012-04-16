@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.eclipse.ui.menus">
+      <menuContribution
+            allPopups="false"
+            locationURI="popup:org.eclipse.jdt.ui.PackageExplorer">
+         <command
+               commandId="org.teiid.project.refresher.refreshProjectCommand"
+               icon="icons/refresh.png"
+               label="Refresh Projects"
+               style="push">
+         </command>
+      </menuContribution>
+      <menuContribution
+            allPopups="false"
+            locationURI="toolbar:org.eclipse.jdt.ui.PackageExplorer">
+         <command
+               commandId="org.teiid.project.refresher.refreshProjectCommand"
+               icon="icons/refresh.png"
+               label="Refresh Projects"
+               style="push">
+         </command>
+      </menuContribution>
+   </extension>
+   <extension
+         point="org.eclipse.ui.commands">
+      <command
+            defaultHandler="org.teiid.project.refresher.RefreshProjectHandler"
+            id="org.teiid.project.refresher.refreshProjectCommand"
+            name="Refresh Projects">
+      </command>
+   </extension>
+
+</plugin>
