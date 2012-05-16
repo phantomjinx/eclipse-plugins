@@ -26,11 +26,11 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import org.eclipse.core.commands.ExecutionEvent;
-import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.core.commands.IHandler;
 import org.eclipse.core.commands.IHandlerListener;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.IWorkspaceRunnable;
 import org.eclipse.core.resources.ResourcesPlugin;
@@ -53,307 +53,344 @@ import org.eclipse.ui.PlatformUI;
 
 public class RefreshProjectHandler implements IHandler {
 
-    private static final String DOT_PROJECT_FILE = ".project";
+	private static final String DOT_PROJECT_FILE = ".project"; //$NON-NLS-1$
 
-    private Logger logger = Logger.getLogger(this.getClass().getCanonicalName());
+	private Logger logger = Logger
+			.getLogger(this.getClass().getCanonicalName());
 
-    @Override
-    public Object execute(ExecutionEvent event) throws ExecutionException {
+	@Override
+	public Object execute(ExecutionEvent event) {
 
-        // Choose the directory to refresh from
-        final String projectDirectory = getChosenDirectory();
-        if (projectDirectory == null) {
-            return null;
-        }
+		// Choose the directory to refresh from
+		final String projectDirectory = getChosenDirectory();
+		if (projectDirectory == null) {
+			return null;
+		}
 
-        Job job = new Job("Project synchronizer") {
+		Job job = new Job("Project synchronizer") { //$NON-NLS-1$
 
-            @Override
-            public IStatus run(IProgressMonitor monitor) {
-                try {
-                    synchronizeProjects(projectDirectory, monitor);
-                } catch (CoreException ex) {
-                    logger.severe(ex.getMessage());
-                    ex.printStackTrace();
-                    return Status.CANCEL_STATUS;
-                }
-                return Status.OK_STATUS;
-            }
-        };
+			@Override
+			public IStatus run(IProgressMonitor monitor) {
+				try {
+					synchronizeProjects(projectDirectory, monitor);
+				}
+				catch (CoreException ex) {
+					logger.severe(ex.getMessage());
+					ex.printStackTrace();
+					return Status.CANCEL_STATUS;
+				}
+				return Status.OK_STATUS;
+			}
+		};
 
-        job.setPriority(Job.LONG);
-        job.schedule();
-        return null;
-    }
+		job.setPriority(Job.LONG);
+		job.schedule();
+		return null;
+	}
 
-    /**
-     * Synchronize all projects:
-     * <ul>
-     * <li>import new projects</li>
-     * <li>delete invalid projects</li>
-     * <li>refresh modified projects</li>
-     * <li>organise projects into their working sets</li>
-     * </ul>
-     * 
-     * @param projectDirectory
-     * @param monitor
-     * @throws CoreException
-     */
-    private void synchronizeProjects(final String projectDirectory, IProgressMonitor monitor) throws CoreException {
-        // Import those projects not already in the workspace
-        IProject[] projects = ResourcesPlugin.getWorkspace().getRoot().getProjects();
-        final Map<String, IProject> projectMap = new HashMap<String, IProject>();
+	/**
+	 * Synchronize all projects:
+	 * <ul>
+	 * <li>import new projects</li>
+	 * <li>delete invalid projects</li>
+	 * <li>refresh modified projects</li>
+	 * <li>organise projects into their working sets</li>
+	 * </ul>
+	 * 
+	 * @param projectDirectory
+	 * @param monitor
+	 * @throws CoreException
+	 */
+	private void synchronizeProjects(final String projectDirectory,
+			IProgressMonitor monitor) throws CoreException {
+		// Import those projects not already in the workspace
+		IProject[] projects = ResourcesPlugin.getWorkspace().getRoot()
+				.getProjects();
+		final Map<String, IProject> projectMap = new HashMap<String, IProject>();
 
-        if (projects != null) {
-            for (IProject project : projects) {
-                projectMap.put(project.getName(), project);
-            }
-        }
+		if (projects != null) {
+			for (IProject project : projects) {
+				projectMap.put(project.getName(), project);
+			}
+		}
 
-        ResourcesPlugin.getWorkspace().run(new IWorkspaceRunnable() {
-            @Override
-            public void run(IProgressMonitor monitor) throws CoreException {
-                monitor.beginTask("Synchronizing projects to filesystem. ", 3);
-                // Import new projects
-                monitor.subTask("Importing new projects...");
-                importProjects(projectDirectory, projectMap);
-                monitor.worked(1);
+		ResourcesPlugin.getWorkspace().run(new IWorkspaceRunnable() {
+			@Override
+			public void run(IProgressMonitor monitor) throws CoreException {
+				monitor.beginTask("Synchronizing projects to filesystem. ", 3); //$NON-NLS-1$
+				// Import new projects
+				monitor.subTask("Importing new projects..."); //$NON-NLS-1$
+				importProjects(projectDirectory, projectMap);
+				monitor.worked(1);
 
-                // Refresh all projects in the workspace
-                // Remove those projects no longer in the filesystem
-                monitor.subTask("Refreshing projects...");
-                refreshProjects(projectMap, monitor);
-                monitor.worked(1);
+				// Refresh all projects in the workspace
+				// Remove those projects no longer in the filesystem
+				monitor.subTask("Refreshing projects..."); //$NON-NLS-1$
+				refreshProjects(projectMap, monitor);
+				monitor.worked(1);
 
-                monitor.subTask("Organising projects in working sets...");
-                organiseProjects(projectMap);
-                monitor.done();
-            }
-        }, ResourcesPlugin.getWorkspace().getRoot(), IWorkspace.AVOID_UPDATE, monitor);
-    }
+				monitor.subTask("Organising projects in working sets..."); //$NON-NLS-1$
+				organiseProjects(projectMap);
+				monitor.done();
 
-    /**
-     * For each project, identify their parent directory and use this as a
-     * working set category. Add the working set if required and display all the
-     * working sets in the package explorer.
-     * 
-     * @param projectMap
-     */
-    private void organiseProjects(Map<String, IProject> projectMap) {
-        final IWorkingSetManager wsManager = PlatformUI.getWorkbench().getWorkingSetManager();
-        final List<IWorkingSet> workingSets = new ArrayList<IWorkingSet>();
+				projectMap.clear();
+			}
+		}, ResourcesPlugin.getWorkspace().getRoot(), IWorkspace.AVOID_UPDATE,
+				monitor);
+	}
 
-        for (IProject project : projectMap.values()) {
-            IPath location = project.getLocation();
-            File fileLocation = location.toFile();
-            if (fileLocation == null) {
-                continue;
-            }
+	/**
+	 * For each project, identify their parent directory and use this as a
+	 * working set category. Add the working set if required and display all the
+	 * working sets in the package explorer.
+	 * 
+	 * @param projectMap
+	 */
+	private void organiseProjects(Map<String, IProject> projectMap) {
+		final IWorkingSetManager wsManager = PlatformUI.getWorkbench()
+				.getWorkingSetManager();
+		final List<IWorkingSet> workingSets = new ArrayList<IWorkingSet>();
+		Map<String, List<IProject>> wsToProjectsMap = new HashMap<String, List<IProject>>();
 
-            String wsName = fileLocation.getParentFile().getName();
-            IWorkingSet workingSet = wsManager.getWorkingSet(wsName);
-            IAdaptable[] adaptedProjects = new IAdaptable[] { project };
+		IWorkingSet[] allWorkingSets = wsManager.getAllWorkingSets();
+		for (IWorkingSet workingSet : allWorkingSets) {
+			if (!workingSet.getName().equals("Other Projects")) { //$NON-NLS-1$
+				wsManager.removeWorkingSet(workingSet);
+			}
+		}
 
-            if (workingSet == null) {
-                workingSet = wsManager.createWorkingSet(wsName, adaptedProjects);
-                workingSet.setId("org.eclipse.jdt.ui.JavaWorkingSetPage");
-                wsManager.addWorkingSet(workingSet);
-                workingSets.add(workingSet);
-            } else {
-                IAdaptable[] adaptedNewElements = workingSet.adaptElements(adaptedProjects);
-                if (adaptedNewElements.length == 1) {
-                    IAdaptable[] elements = workingSet.getElements();
-                    IAdaptable[] newElements = new IAdaptable[elements.length + 1];
-                    System.arraycopy(elements, 0, newElements, 0, elements.length);
-                    newElements[newElements.length - 1] = adaptedNewElements[0];
-                    workingSet.setElements(newElements);
-                }
-            }
-        }
+		for (IProject project : projectMap.values()) {
+			IPath location = project.getLocation();
+			File fileLocation = location.toFile();
+			if (fileLocation == null) {
+				continue;
+			}
 
-        Display.getDefault().syncExec(new Runnable() {
-            @Override
-            public void run() {
-                IViewPart viewPart = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().findView(JavaUI.ID_PACKAGES);
-                if (viewPart == null) {
-                    try {
-                        viewPart = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView(JavaUI.ID_PACKAGES);
-                    } catch (PartInitException ex) {
-                        logger.severe("Cannot display Package Explorer view");
-                        ex.printStackTrace();
-                    }
-                }
+			String wsName = fileLocation.getParentFile().getName();
+			List<IProject> projects = wsToProjectsMap.get(wsName);
+			if (projects == null) {
+				projects = new ArrayList<IProject>();
+				wsToProjectsMap.put(wsName, projects);
+			}
 
-                PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().setWorkingSets(workingSets.toArray(new IWorkingSet[0]));
+			projects.add(project);
+		}
 
-                // if (viewPart instanceof PackageExplorerPart) {
-                // PackageExplorerPart explorer = (PackageExplorerPart)
-                // viewPart;
-                // IWorkingSet[] sortedWorkingSets =
-                // wsManager.getAllWorkingSets();
-                // explorer.rootModeChanged(PackageExplorerPart.WORKING_SETS_AS_ROOTS);
-                // explorer.getWorkingSetModel().addWorkingSets(sortedWorkingSets);
-                // explorer.getWorkingSetModel().configured();
-                // }
-            }
-        });
-    }
+		for (Map.Entry<String, List<IProject>> entry : wsToProjectsMap
+				.entrySet()) {
 
-    /**
-     * Refresh all the projects in the given map but sync'ing them to the
-     * location on the filesystem.
-     * 
-     * @param projectMap
-     * @param monitor
-     * @throws CoreException
-     */
-    private void refreshProjects(Map<String, IProject> projectMap, IProgressMonitor monitor) throws CoreException {
-        Collection<IProject> projects = new ArrayList<IProject>(projectMap.values());
+			IWorkingSet workingSet = wsManager.getWorkingSet(entry.getKey());
+			IAdaptable[] adaptedProjects = entry.getValue().toArray(
+					new IAdaptable[0]);
 
-        for (IProject project : projects) {
-            IPath location = project.getLocation();
+			if (workingSet == null) {
+				workingSet = wsManager.createWorkingSet(entry.getKey(),
+						adaptedProjects);
+				workingSet.setId("org.eclipse.jdt.ui.JavaWorkingSetPage"); //$NON-NLS-1$
+				wsManager.addWorkingSet(workingSet);
+				workingSets.add(workingSet);
+			}
+			else {
+				IAdaptable[] adaptedNewElements = workingSet
+						.adaptElements(adaptedProjects);
+				if (adaptedNewElements.length > 1) {
+					workingSet.setElements(adaptedProjects);
+				}
+			}
+		}
 
-            if (location.toFile().exists() && !isShellProject(project)) {
-                project.refreshLocal(IProject.DEPTH_INFINITE, monitor);
-            } else {
-                projectMap.remove(project.getName());
-                project.delete(false, true, monitor);
-            }
-        }
+		Display.getDefault().syncExec(new Runnable() {
+			@Override
+			public void run() {
+				IViewPart viewPart = PlatformUI.getWorkbench()
+						.getActiveWorkbenchWindow().getActivePage()
+						.findView(JavaUI.ID_PACKAGES);
+				if (viewPart == null) {
+					try {
+						viewPart = PlatformUI.getWorkbench()
+								.getActiveWorkbenchWindow().getActivePage()
+								.showView(JavaUI.ID_PACKAGES);
+					}
+					catch (PartInitException ex) {
+						logger.severe("Cannot display Package Explorer view"); //$NON-NLS-1$
+						ex.printStackTrace();
+					}
+				}
 
-        projects.clear();
-    }
+				PlatformUI
+						.getWorkbench()
+						.getActiveWorkbenchWindow()
+						.getActivePage()
+						.setWorkingSets(workingSets.toArray(new IWorkingSet[0]));
+			}
+		});
+	}
 
-    /**
-     * Its possible that eclipse's save workspace system kicks in and recreates
-     * .project files in deleted projects that have not yet been removed.
-     * However, we want to destroy these two so identify these stale projects
-     * 
-     * @param project
-     * @return
-     */
-    private boolean isShellProject(IProject project) {
-        IPath location = project.getLocation();
-        if (location == null) {
-            return true;
-        }
+	/**
+	 * Refresh all the projects in the given map but sync'ing them to the
+	 * location on the filesystem.
+	 * 
+	 * @param projectMap
+	 * @param monitor
+	 * @throws CoreException
+	 */
+	private void refreshProjects(Map<String, IProject> projectMap,
+			IProgressMonitor monitor) throws CoreException {
+		Collection<IProject> projects = new ArrayList<IProject>(
+				projectMap.values());
 
-        File projectDir = location.toFile();
-        if (projectDir == null || !projectDir.exists()) {
-            return true;
-        }
+		for (IProject project : projects) {
+			IPath location = project.getLocation();
 
-        for (File projectFile : projectDir.listFiles()) {
-            if (projectFile.getName().equals(DOT_PROJECT_FILE)) {
-                continue;
-            } else {
-                return false;
-            }
-        }
+			if (location.toFile().exists() && !isShellProject(project)) {
+				project.refreshLocal(IResource.DEPTH_INFINITE, monitor);
+			}
+			else {
+				projectMap.remove(project.getName());
+				project.delete(false, true, monitor);
+			}
+		}
 
-        return true;
-    }
+		projects.clear();
+	}
 
-    /**
-     * Find and import any projects from the given root project directory
-     * 
-     * @param projectDirectory
-     * @param projectMap
-     * @throws CoreException
-     */
-    private void importProjects(String projectDirectory, Map<String, IProject> projectMap) throws CoreException {
+	/**
+	 * Its possible that eclipse's save workspace system kicks in and recreates
+	 * .project files in deleted projects that have not yet been removed.
+	 * However, we want to destroy these two so identify these stale projects
+	 * 
+	 * @param project
+	 * @return
+	 */
+	private boolean isShellProject(IProject project) {
+		IPath location = project.getLocation();
+		if (location == null) {
+			return true;
+		}
 
-        File projectDir = new File(projectDirectory);
-        if (!projectDir.exists()) {
-            logger.severe("Chosen directory does not exist!");
-            return;
-        }
+		File projectDir = location.toFile();
+		if (projectDir == null || !projectDir.exists()) {
+			return true;
+		}
 
-        importProject(projectDir, projectMap);
-    }
+		for (File projectFile : projectDir.listFiles()) {
+			if (projectFile.getName().equals(DOT_PROJECT_FILE)) {
+				continue;
+			}
+			else {
+				return false;
+			}
+		}
 
-    /**
-     * Import the project from the given project directory. If this proposed
-     * directory is not a project then it may contain projects so recurse down.
-     * 
-     * @param projectDir
-     * @param projectMap
-     * @throws CoreException
-     */
-    private void importProject(File projectDir, Map<String, IProject> projectMap) throws CoreException {
-        File projectFile = new File(projectDir, DOT_PROJECT_FILE);
+		return true;
+	}
 
-        if (projectFile.exists()) {
-            // Import the project
-            Path projectPath = new Path(projectFile.getAbsolutePath());
-            IProjectDescription description = ResourcesPlugin.getWorkspace().loadProjectDescription(projectPath);
+	/**
+	 * Find and import any projects from the given root project directory
+	 * 
+	 * @param projectDirectory
+	 * @param projectMap
+	 * @throws CoreException
+	 */
+	private void importProjects(String projectDirectory,
+			Map<String, IProject> projectMap) throws CoreException {
 
-            if (projectMap.containsKey(description.getName())) {
-                // Already imported this project
-                return;
-            }
+		File projectDir = new File(projectDirectory);
+		if (!projectDir.exists()) {
+			logger.severe("Chosen directory does not exist!"); //$NON-NLS-1$
+			return;
+		}
 
-            IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(description.getName());
-            project.create(description, null);
-            project.open(null);
+		importProject(projectDir, projectMap);
+	}
 
-            projectMap.put(project.getName(), project);
-        } else {
-            // Not a project but maybe contains projects?
-            for (File subDir : projectDir.listFiles()) {
-                if (!subDir.isDirectory()) {
-                    continue;
-                }
+	/**
+	 * Import the project from the given project directory. If this proposed
+	 * directory is not a project then it may contain projects so recurse down.
+	 * 
+	 * @param projectDir
+	 * @param projectMap
+	 * @throws CoreException
+	 */
+	private void importProject(File projectDir, Map<String, IProject> projectMap)
+			throws CoreException {
+		File projectFile = new File(projectDir, DOT_PROJECT_FILE);
 
-                importProject(subDir, projectMap);
-            }
-        }
-    }
+		if (projectFile.exists()) {
+			// Import the project
+			Path projectPath = new Path(projectFile.getAbsolutePath());
+			IProjectDescription description = ResourcesPlugin.getWorkspace()
+					.loadProjectDescription(projectPath);
 
-    /**
-     * Get the root directory to refresh projects against
-     * 
-     * @return
-     */
-    private String getChosenDirectory() {
-        DirectoryDialog dlg = new DirectoryDialog(PlatformUI.getWorkbench().getDisplay().getActiveShell());
+			if (projectMap.containsKey(description.getName())) {
+				// Already imported this project
+				return;
+			}
 
-        // Change the title bar text
-        dlg.setText("Select directory to be synchronised against.");
+			IProject project = ResourcesPlugin.getWorkspace().getRoot()
+					.getProject(description.getName());
+			project.create(description, null);
+			project.open(null);
 
-        // Customizable message displayed in the dialog
-        dlg.setMessage("Select a directory");
+			projectMap.put(project.getName(), project);
+		}
+		else {
+			// Not a project but maybe contains projects?
+			for (File subDir : projectDir.listFiles()) {
+				if (!subDir.isDirectory()) {
+					continue;
+				}
 
-        // Calling open() will open and run the dialog.
-        // It will return the selected directory, or
-        // null if user cancels
-        String dir = dlg.open();
-        return dir;
-    }
+				importProject(subDir, projectMap);
+			}
+		}
+	}
 
-    @Override
-    public boolean isEnabled() {
-        return true;
-    }
+	/**
+	 * Get the root directory to refresh projects against
+	 * 
+	 * @return
+	 */
+	private String getChosenDirectory() {
+		DirectoryDialog dlg = new DirectoryDialog(PlatformUI.getWorkbench()
+				.getDisplay().getActiveShell());
 
-    @Override
-    public boolean isHandled() {
-        return true;
-    }
+		// Change the title bar text
+		dlg.setText("Select directory to be synchronised against."); //$NON-NLS-1$
 
-    @Override
-    public void addHandlerListener(IHandlerListener handlerListener) {
-        // Not required
-    }
+		// Customizable message displayed in the dialog
+		dlg.setMessage("Select a directory"); //$NON-NLS-1$
 
-    @Override
-    public void dispose() {
-        // TODO Auto-generated method stub
-    }
+		// Calling open() will open and run the dialog.
+		// It will return the selected directory, or
+		// null if user cancels
+		String dir = dlg.open();
+		return dir;
+	}
 
-    @Override
-    public void removeHandlerListener(IHandlerListener handlerListener) {
-        // No Required
-    }
+	@Override
+	public boolean isEnabled() {
+		return true;
+	}
+
+	@Override
+	public boolean isHandled() {
+		return true;
+	}
+
+	@Override
+	public void addHandlerListener(IHandlerListener handlerListener) {
+		// Not required
+	}
+
+	@Override
+	public void dispose() {
+		// TODO Auto-generated method stub
+	}
+
+	@Override
+	public void removeHandlerListener(IHandlerListener handlerListener) {
+		// No Required
+	}
 
 }
