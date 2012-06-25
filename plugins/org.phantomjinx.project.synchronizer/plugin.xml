@@ -9,7 +9,7 @@
          <command
                commandId="org.teiid.project.refresher.refreshProjectCommand"
                icon="icons/refresh.png"
-               label="Refresh Projects"
+               label="%command.label"
                style="push">
          </command>
       </menuContribution>
@@ -19,7 +19,7 @@
          <command
                commandId="org.teiid.project.refresher.refreshProjectCommand"
                icon="icons/refresh.png"
-               label="Refresh Projects"
+               label="%command.label.0"
                style="push">
          </command>
       </menuContribution>
