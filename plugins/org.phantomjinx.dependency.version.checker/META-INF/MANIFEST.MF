@@ -1,13 +1,15 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: %pluginName
-Bundle-SymbolicName: org.phantomjinx.project.synchronizer;singleton:=true
-Bundle-Version: 1.0.6
+Bundle-Name: %Bundle-Name
+Bundle-SymbolicName: org.phantomjinx.dependency.version.checker;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Vendor: %Bundle-Vendor
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.resources;bundle-version="3.7.101",
  org.eclipse.core.runtime;bundle-version="3.7.0",
  org.eclipse.jdt.ui;bundle-version="3.7.2",
  org.eclipse.jdt;bundle-version="3.7.2",
- org.eclipse.jdt.core;bundle-version="3.7.3"
-Bundle-Vendor: %Bundle-Vendor
+ org.eclipse.jdt.core;bundle-version="3.7.3",
+ org.eclipse.pde;bundle-version="3.7.0",
+ org.eclipse.pde.core;bundle-version="3.8.0"

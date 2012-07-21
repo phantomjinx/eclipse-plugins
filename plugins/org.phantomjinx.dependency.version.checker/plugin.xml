@@ -7,8 +7,8 @@
             allPopups="false"
             locationURI="popup:org.eclipse.jdt.ui.PackageExplorer">
          <command
-               commandId="org.phantomjinx.project.refreshProjectCommand"
-               icon="icons/refresh.png"
+               commandId="org.phantomjinx.dependency.version.checker"
+               icon="icons/check.png"
                label="%command.label"
                style="push">
          </command>
@@ -17,9 +17,9 @@
             allPopups="false"
             locationURI="toolbar:org.eclipse.jdt.ui.PackageExplorer">
          <command
-               commandId="org.phantomjinx.project.refreshProjectCommand"
-               icon="icons/refresh.png"
-               label="%command.label"
+               commandId="org.phantomjinx.dependency.version.checker"
+               icon="icons/check.png"
+               label="%command.label.0"
                style="push">
          </command>
       </menuContribution>
@@ -27,8 +27,8 @@
    <extension
          point="org.eclipse.ui.commands">
       <command
-            defaultHandler="org.phantomjinx.project.refresher.RefreshProjectHandler"
-            id="org.phantomjinx.project.refreshProjectCommand"
+            defaultHandler="org.phantomjinx.dependency.version.checker.VersionCheckerHandler"
+            id="org.phantomjinx.dependency.version.checker"
             name="%command.label">
       </command>
    </extension>
