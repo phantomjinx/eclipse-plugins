@@ -43,7 +43,6 @@ import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.osgi.service.resolver.BundleDescription;
 import org.eclipse.osgi.service.resolver.BundleSpecification;
-import org.eclipse.osgi.service.resolver.VersionRange;
 import org.eclipse.pde.core.plugin.IPluginModelBase;
 import org.eclipse.pde.internal.core.PDECore;
 import org.eclipse.pde.internal.core.PluginModelManager;
@@ -60,11 +59,17 @@ public class VersionCheckerHandler implements IHandler {
 
 	private static final String SPEECH_MARK = "\""; //$NON-NLS-1$
 
-	private static final String SEMI_COLON = ":"; //$NON-NLS-1$
+	private static final String SEMI_COLON = ";"; //$NON-NLS-1$
+	
+	private static final String COLON = ":"; //$NON-NLS-1$
 	
 	private static final String COMMA = ","; //$NON-NLS-1$
 
 	private static final String SPACE = " "; //$NON-NLS-1$
+	
+	private static final String OPEN_SQUARE_BRACKET = "["; //$NON-NLS-1$
+
+	private static final String CLOSE_BRACKET = ")"; //$NON-NLS-1$
 
 	private static final String META_INF = "META-INF"; //$NON-NLS-1$
 
@@ -150,12 +155,6 @@ public class VersionCheckerHandler implements IHandler {
 			Map<String, Version> reqBundleMap = new HashMap<String, Version>();
 			
 			for (BundleSpecification bundleSpec : requiredBundles) {
-				VersionRange versionRange = bundleSpec.getVersionRange();
-				Version minimum = versionRange.getMinimum();
-				if (minimum.compareTo(ZERO) > 0) {
-					continue;
-				}
-				
 				logger.info("\t" + bundleSpec.getVersionRange() + "\t" + bundleSpec.getName()); //$NON-NLS-1$ //$NON-NLS-2$
 				
 				IPluginModelBase reqBundleModel = modelManager.findModel(bundleSpec.getName());
@@ -209,22 +208,25 @@ public class VersionCheckerHandler implements IHandler {
 				if (line.startsWith(REQUIRE_BUNDLE)) {
 					inRequireBundle = true;
 				} else if (inRequireBundle && !line.startsWith(SPACE)
-						&& line.contains(SEMI_COLON)) {
+						&& line.contains(COLON)) {
 					// finished the require-bundle section
 					inRequireBundle = false;
 				}
 
-				if (inRequireBundle && !line.contains(BUNDLE_VERSION_TAG)) {
+				if (inRequireBundle) {
+					line = removeBundleVersionTag(line);
+				
 					for (Entry<String, Version> entry : reqBundleMap.entrySet()) {
 						String reqBundle = entry.getKey();
 
 						if (line.contains(reqBundle + COMMA) || line.endsWith(reqBundle)) {
-							String version = entry.getValue().getMajor() + DOT + entry.getValue().getMinor() + DOT + entry.getValue().getMicro();
+							String minVersion = entry.getValue().getMajor() + DOT + entry.getValue().getMinor() + DOT + entry.getValue().getMicro();
+							String maxVersion = (entry.getValue().getMajor() + 1) + DOT + ZERO.getMinor() + DOT + ZERO.getMicro(); 
 							
-							String lineAndVersion = reqBundle + BUNDLE_VERSION_TAG + version + SPEECH_MARK;
+							String lineAndVersion = reqBundle + BUNDLE_VERSION_TAG + OPEN_SQUARE_BRACKET + minVersion + COMMA + maxVersion + CLOSE_BRACKET + SPEECH_MARK;
 							line = line.replace(reqBundle, lineAndVersion);
 						}
-					}	
+					}
 				}
 
 				buf.append(line);
@@ -256,6 +258,24 @@ public class VersionCheckerHandler implements IHandler {
 		}
 	}
 	
+	/**
+	 * @param line
+	 * @return
+	 */
+	private String removeBundleVersionTag(String line) {
+		if (! line.contains(BUNDLE_VERSION_TAG))
+			return line;
+		
+		String[] splits = line.split(SEMI_COLON);
+		String newLine = splits[0];
+		
+		if (line.endsWith(COMMA)) {
+			newLine = newLine.concat(COMMA);
+		}
+		
+		return newLine;
+	}
+
 	private void writeManifest(File manifestFile, StringBuffer buf) throws Exception {
 		FileWriter writer = new FileWriter(manifestFile);
 		writer.write(buf.toString());

@@ -147,18 +147,9 @@ public class RefreshProjectHandler implements IHandler {
 	 * 
 	 * @param projectMap
 	 */
-	private void organiseProjects(Map<String, IProject> projectMap) {
-		final IWorkingSetManager wsManager = PlatformUI.getWorkbench()
-				.getWorkingSetManager();
-		final List<IWorkingSet> workingSets = new ArrayList<IWorkingSet>();
+	private void organiseProjects(final Map<String, IProject> projectMap) {
+		IWorkingSetManager wsManager = PlatformUI.getWorkbench().getWorkingSetManager();
 		Map<String, List<IProject>> wsToProjectsMap = new HashMap<String, List<IProject>>();
-
-		IWorkingSet[] allWorkingSets = wsManager.getAllWorkingSets();
-		for (IWorkingSet workingSet : allWorkingSets) {
-			if (!workingSet.getName().equals("Other Projects")) { //$NON-NLS-1$
-				wsManager.removeWorkingSet(workingSet);
-			}
-		}
 
 		for (IProject project : projectMap.values()) {
 			IPath location = project.getLocation();
@@ -177,12 +168,11 @@ public class RefreshProjectHandler implements IHandler {
 			projects.add(project);
 		}
 
-		for (Map.Entry<String, List<IProject>> entry : wsToProjectsMap
-				.entrySet()) {
+		final List<IWorkingSet> workingSets = new ArrayList<IWorkingSet>();
+		for (Map.Entry<String, List<IProject>> entry : wsToProjectsMap.entrySet()) {
 
 			IWorkingSet workingSet = wsManager.getWorkingSet(entry.getKey());
-			IAdaptable[] adaptedProjects = entry.getValue().toArray(
-					new IAdaptable[0]);
+			IAdaptable[] adaptedProjects = entry.getValue().toArray(new IAdaptable[0]);
 
 			if (workingSet == null) {
 				workingSet = wsManager.createWorkingSet(entry.getKey(),
@@ -192,8 +182,7 @@ public class RefreshProjectHandler implements IHandler {
 				workingSets.add(workingSet);
 			}
 			else {
-				IAdaptable[] adaptedNewElements = workingSet
-						.adaptElements(adaptedProjects);
+				IAdaptable[] adaptedNewElements = workingSet.adaptElements(adaptedProjects);
 				if (adaptedNewElements.length > 1) {
 					workingSet.setElements(adaptedProjects);
 				}
@@ -293,8 +282,7 @@ public class RefreshProjectHandler implements IHandler {
 	 * @param projectMap
 	 * @throws CoreException
 	 */
-	private void importProjects(String projectDirectory,
-			Map<String, IProject> projectMap) throws CoreException {
+	private void importProjects(String projectDirectory, Map<String, IProject> projectMap) throws CoreException {
 
 		File projectDir = new File(projectDirectory);
 		if (!projectDir.exists()) {
