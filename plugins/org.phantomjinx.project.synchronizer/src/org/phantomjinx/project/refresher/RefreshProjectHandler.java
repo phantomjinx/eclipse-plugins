@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
-
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.IHandler;
 import org.eclipse.core.commands.IHandlerListener;
@@ -158,7 +157,10 @@ public class RefreshProjectHandler implements IHandler {
 				continue;
 			}
 
-			String wsName = fileLocation.getParentFile().getName();
+			File parentDir = fileLocation.getParentFile();
+            File projectDir = parentDir.getParentFile();
+            
+            String wsName = projectDir != null ? projectDir.getName() + "-" + parentDir.getName() : parentDir.getName();
 			List<IProject> projects = wsToProjectsMap.get(wsName);
 			if (projects == null) {
 				projects = new ArrayList<IProject>();

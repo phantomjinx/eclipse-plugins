@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <site>
-   <feature url="features/org.phantomjinx.tools.feature_1.0.8.jar" id="org.phantomjinx.tools.feature" version="1.0.8"/>
+   <feature url="features/org.phantomjinx.tools.feature_1.0.9.jar" id="org.phantomjinx.tools.feature" version="1.0.9"/>
 </site>
