@@ -20,6 +20,7 @@ package org.phantomjinx.project.refresher;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -51,6 +52,7 @@ import org.eclipse.ui.IWorkingSetManager;
 import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.PlatformUI;
 
+@SuppressWarnings( "nls" )
 public class RefreshProjectHandler implements IHandler {
 
 	private static final String DOT_PROJECT_FILE = ".project"; //$NON-NLS-1$
@@ -124,14 +126,15 @@ public class RefreshProjectHandler implements IHandler {
 				monitor.worked(1);
 
 				// Refresh all projects in the workspace
-				// Remove those projects no longer in the filesystem
-				monitor.subTask("Refreshing projects..."); //$NON-NLS-1$
-				refreshProjects(projectMap, monitor);
-				monitor.worked(1);
+                // Remove those projects no longer in the filesystem
+                monitor.subTask("Refreshing projects..."); //$NON-NLS-1$
+                refreshProjects(projectMap, monitor);
+                monitor.worked(1);
 
-				monitor.subTask("Organising projects in working sets..."); //$NON-NLS-1$
-				organiseProjects(projectMap);
-				monitor.done();
+                // Organise the projects into working sets
+                monitor.subTask("Organising projects in working sets..."); //$NON-NLS-1$
+                organiseProjects(projectMap);
+                monitor.done();
 
 				projectMap.clear();
 			}
@@ -147,9 +150,11 @@ public class RefreshProjectHandler implements IHandler {
 	 * @param projectMap
 	 */
 	private void organiseProjects(final Map<String, IProject> projectMap) {
-		IWorkingSetManager wsManager = PlatformUI.getWorkbench().getWorkingSetManager();
-		Map<String, List<IProject>> wsToProjectsMap = new HashMap<String, List<IProject>>();
 
+		IWorkingSetManager wsManager = PlatformUI.getWorkbench().getWorkingSetManager();
+
+		// Devise the working set / project map
+		Map<String, List<IProject>> wsToProjectsMap = new HashMap<String, List<IProject>>();
 		for (IProject project : projectMap.values()) {
 			IPath location = project.getLocation();
 			File fileLocation = location.toFile();
@@ -170,7 +175,8 @@ public class RefreshProjectHandler implements IHandler {
 			projects.add(project);
 		}
 
-		final List<IWorkingSet> workingSets = new ArrayList<IWorkingSet>();
+		// Create / append the projects to the working set
+		final List<IWorkingSet>workingSets = new ArrayList<IWorkingSet>();
 		for (Map.Entry<String, List<IProject>> entry : wsToProjectsMap.entrySet()) {
 
 			IWorkingSet workingSet = wsManager.getWorkingSet(entry.getKey());
@@ -185,12 +191,14 @@ public class RefreshProjectHandler implements IHandler {
 			}
 			else {
 				IAdaptable[] adaptedNewElements = workingSet.adaptElements(adaptedProjects);
-				if (adaptedNewElements.length > 1) {
-					workingSet.setElements(adaptedProjects);
-				}
+				if (adaptedNewElements == null || adaptedNewElements.length == 0)
+				    adaptedNewElements = new IAdaptable[0];
+
+				workingSet.setElements(adaptedNewElements);
 			}
 		}
 
+		// Redisplay the Java Package view and set to show working sets
 		Display.getDefault().syncExec(new Runnable() {
 			@Override
 			public void run() {
@@ -227,23 +235,53 @@ public class RefreshProjectHandler implements IHandler {
 	 * @throws CoreException
 	 */
 	private void refreshProjects(Map<String, IProject> projectMap,
-			IProgressMonitor monitor) throws CoreException {
-		Collection<IProject> projects = new ArrayList<IProject>(
-				projectMap.values());
+	                                               IProgressMonitor monitor) throws CoreException {
 
+		Collection<IProject> projects = new ArrayList<IProject>(projectMap.values());
 		for (IProject project : projects) {
-			IPath location = project.getLocation();
+ 			IPath location = project.getLocation();
 
 			if (location.toFile().exists() && !isShellProject(project)) {
+			    logger.info("Refreshing project " + project.getName());
 				project.refreshLocal(IResource.DEPTH_INFINITE, monitor);
 			}
 			else {
+			    logger.info("Deleting project " + project.getName());
+
+			    // Remove the project from any working sets that it may be located in
+			    IWorkingSetManager wsManager = PlatformUI.getWorkbench().getWorkingSetManager();
+			    IWorkingSet[] workingSets = wsManager.getAllWorkingSets();
+			    for (IWorkingSet workingSet : workingSets) {
+			        List<IAdaptable> wsContents = new ArrayList<IAdaptable>();
+			        wsContents.addAll(Arrays.asList(workingSet.getElements()));
+
+			        List<IAdaptable> newWsContents = new ArrayList<IAdaptable>();
+			        for (IAdaptable element : wsContents) {
+			            IProject wsProject = (IProject) element.getAdapter(IProject.class);
+			            if (wsProject != null) {
+			                if (wsProject.equals(project))
+			                    continue;
+			            }
+
+			            newWsContents.add(element);			                
+			        }
+
+			        workingSet.setElements(newWsContents.toArray(new IAdaptable[0]));
+			    }
+
+			    // Remove the project from our map
 				projectMap.remove(project.getName());
+
+				// Delete the project from the workspace
 				project.delete(false, true, monitor);
 			}
 		}
 
 		projects.clear();
+
+		for (int i = 0; i < 5; ++i) {
+		    ResourcesPlugin.getWorkspace().getRoot().refreshLocal(IResource.DEPTH_INFINITE, monitor);
+		}
 	}
 
 	/**
@@ -254,26 +292,35 @@ public class RefreshProjectHandler implements IHandler {
 	 * @param project
 	 * @return
 	 */
-	private boolean isShellProject(IProject project) {
+    private boolean isShellProject(IProject project) {
 		IPath location = project.getLocation();
 		if (location == null) {
+		    logger.info("Project " + project.getName() + " is a shell project and will be deleted");
 			return true;
 		}
 
 		File projectDir = location.toFile();
 		if (projectDir == null || !projectDir.exists()) {
+		    logger.info("Project " + project.getName() + " is a shell project and will be deleted");
 			return true;
 		}
 
-		for (File projectFile : projectDir.listFiles()) {
+		File[] projectFiles = projectDir.listFiles();
+
+        for (File projectFile : projectFiles) {
 			if (projectFile.getName().equals(DOT_PROJECT_FILE)) {
 				continue;
 			}
-			else {
-				return false;
+
+			if (projectFile.isDirectory()) {
+			    // If a project is just directories and no files
+			    continue;
 			}
+
+			return false;
 		}
 
+        logger.info("Project " + project.getName() + " is a shell project and will be deleted");
 		return true;
 	}
 
