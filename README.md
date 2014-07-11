@@ -10,6 +10,13 @@ Contains a set of plugins that make Eclipse development just that little bit eas
 * Moves all projects into sensible working sets based on the parent directories of the projects.
   ** A typical RCP repository will have features and plugins directories so the workspace will get similar working sets
 
+## Dependency Version Checker
+* Plugin that searchs all workspace projects and checks their manifests for min and max versions.
+* Should a manifest contain a min version but not a max version then the next major version is added as the max version.
+
 ## Update Site
 To install directly into eclipse, an update site is available [here](http://phantomjinx.co.uk/org.phantomjinx.site)
+
+## How To
+ * Once installed, 2 extra buttons will be displayed on the Package Explorer Toolbar, one for Synchronizer and one for Dependency Version checker.
 
